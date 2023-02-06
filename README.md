@@ -19,6 +19,17 @@ we use an effect. Effects are impure and push-based.
 If you implement every cell as an effect, then you get an eager notebook. Note that Jupyter-style
 lazy notebooks do not have a clear analog, because they cannot be automatically kept up to date.
 
+The kind of workflow this enables is something like:
+- You are working on a complex ML model. Coding coding coding.
+- Finally, you've tweaked the hyperparameters and cleaned the data by running some cells and you are
+  ready to run your model! You run your model cell (which is a computation cell), any values that depend on your updated
+  hyperparameters etc. will be automatically updated since computation cells are pull-based. But
+  also your model cell waited until you pulled it! (When you pull a cell, a call like `model()` is
+  appended to the file/history.)
+- Once your model is finished, your graphs update automatically, because they are presentation
+  cells! And presentation cells are push-based, so you see the results whenever the dependencies
+  update.
+
 ## Random Thoughts...
 
 I think we can track the lineage of a computation by capturing the evaluation context?
@@ -31,6 +42,13 @@ document in a dead cell basically.
 
 Maybe we can associate markdown cells and presentation cells together so that the separation is
 clearer and the user doesn't have to separately pick file type and presentation vs. computation.
+
+The problem with the existing fine-grained reactive model is it doesn't give us enough control over
+the effect updating by default. So in scenario in the previous section, during the first step we
+will be updating signals that update the presentation cells that ultimately force the model to
+update too soon! So we need to think about this a bit more.
+
+Maybe a presentation cell is a component? Maybe a notebook is a component?
 
 ## Cell Types
 

@@ -16,6 +16,7 @@ import {
   crosshairCursor,
   lineNumbers,
   highlightActiveLineGutter,
+  EditorView,
 } from "@codemirror/view";
 import {
   defaultHighlightStyle,
@@ -35,55 +36,24 @@ import {
 } from "@codemirror/autocomplete";
 import { lintKeymap } from "@codemirror/lint";
 import { javascript } from "@codemirror/lang-javascript";
+import { CodeCell } from "./CodeCell";
 
 const App: Component = () => {
-  const {
-    editorView,
-    ref: editorRef,
-    createExtension,
-  } = createCodeMirror({
-    // The initial value of the editor
-    value: "console.log('hello world!')",
-    // Fired whenever the editor code value changes.
-    onValueChange: (value) => console.log("value changed", value),
-    // Fired whenever a change occurs to the document. There is a certain difference with `onChange`.
-    onModelViewUpdate: (modelView) =>
-      console.log("modelView updated", modelView),
-  });
-
-  createExtension([
-    lineNumbers(),
-    highlightActiveLineGutter(),
-    highlightSpecialChars(),
-    history(),
-    foldGutter(),
-    drawSelection(),
-    dropCursor(),
-    EditorState.allowMultipleSelections.of(true),
-    indentOnInput(),
-    syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
-    bracketMatching(),
-    closeBrackets(),
-    autocompletion(),
-    rectangularSelection(),
-    crosshairCursor(),
-    highlightActiveLine(),
-    highlightSelectionMatches(),
-    keymap.of([
-      ...closeBracketsKeymap,
-      ...defaultKeymap,
-      ...searchKeymap,
-      ...historyKeymap,
-      ...foldKeymap,
-      ...completionKeymap,
-      ...lintKeymap,
-    ]),
-    javascript({
-      typescript: true,
-    }),
-  ]);
-
-  return <div ref={editorRef} />;
+  return (
+    <>
+      <CodeCell />
+      <br />
+      <CodeCell />
+      <br />
+      <CodeCell kind="computation" />
+      <br />
+      <CodeCell kind="computation" />
+      <br />
+      <CodeCell kind="computation" />
+      <br />
+      <CodeCell kind="computation" />
+    </>
+  );
 };
 
 export default App;

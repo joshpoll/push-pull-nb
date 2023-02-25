@@ -41,17 +41,21 @@ import { CodeCell } from "./CodeCell";
 const App: Component = () => {
   return (
     <>
-      <CodeCell />
+      <CodeCell cellName={"x"} initialCode={"10"} />
       <br />
-      <CodeCell />
+      <CodeCell cellName={"y"} initialCode={"5"} />
       <br />
-      <CodeCell kind="computation" />
+      <CodeCell
+        cellName={"z"}
+        initialCode={"cells.x + cells.y"}
+        kind="computation"
+      />
       <br />
-      <CodeCell kind="computation" />
+      <CodeCell cellName={"x"} kind="computation" />
       <br />
-      <CodeCell kind="computation" />
+      <CodeCell cellName={"x"} kind="computation" />
       <br />
-      <CodeCell kind="computation" />
+      <CodeCell cellName={"x"} kind="computation" />
     </>
   );
 };

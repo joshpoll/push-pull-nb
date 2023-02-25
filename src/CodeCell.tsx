@@ -36,15 +36,54 @@ import {
 } from "@codemirror/autocomplete";
 import { lintKeymap } from "@codemirror/lint";
 import { javascript } from "@codemirror/lang-javascript";
+import { reactive, createSignal as createSignalR } from "./reactively";
 
 export type Kind = "signal" | "computation" | "effect" | "dead";
 
 export type CodeCellProps = {
   kind?: Kind;
+  initialCode?: string;
+  cellName: string;
+};
+
+export type CellSignal = {
+  value: any;
+  code: string;
 };
 
 export const CodeCell = (props: CodeCellProps) => {
+  const [cellName, setCellName] = createSignal<string>(props.cellName);
+
   const [kind, setKind] = createSignal<Kind>(props.kind ?? "signal");
+
+  // const [cellSignal, setCellSignal] = createSignal<any>({
+  //   value: undefined,
+  //   code: "",
+  // });
+
+  // const signal = reactive<{ value: any; code: string }>({
+  //   value: undefined,
+  //   code: "",
+  // });
+
+  const [rCellSignal, setRCellSignal] = createSignalR<CellSignal>({
+    value: undefined,
+    code: "",
+  });
+
+  const [updateSignal, setUpdateSignal] = createSignal(0);
+
+  const getRCell = () => {
+    // console.log("getRCellSignal", rCellSignal());
+    updateSignal();
+    return rCellSignal();
+  };
+
+  const setRCell = (cellSignal: any) => {
+    // console.log("setRCellSignal", cellSignal({}));
+    setUpdateSignal((x) => x + 1);
+    setRCellSignal(cellSignal);
+  };
 
   const {
     editorView,
@@ -52,7 +91,7 @@ export const CodeCell = (props: CodeCellProps) => {
     createExtension,
   } = createCodeMirror({
     // The initial value of the editor
-    value: kind(),
+    value: props.initialCode ?? kind(),
     // Fired whenever the editor code value changes.
     // onValueChange: (value) => console.log("value changed", value),
     // Fired whenever a change occurs to the document. There is a certain difference with `onChange`.
@@ -96,6 +135,14 @@ export const CodeCell = (props: CodeCellProps) => {
               e.state.doc.toString(),
               eval(e.state.doc.toString())
             );
+            setRCell({
+              code: e.state.doc.toString(),
+              value: eval(e.state.doc.toString()),
+            });
+            // signal.value = {
+            //   code: e.state.doc.toString(),
+            //   value: eval(e.state.doc.toString()),
+            // };
           } catch (e) {}
           return true;
         },
@@ -117,7 +164,36 @@ export const CodeCell = (props: CodeCellProps) => {
         <option value="effect">effect</option>
         <option value="dead">dead</option>
       </select>
-      <div ref={editorRef} />
+      <br />
+      {cellName()} = <div ref={editorRef} />
+      <input
+        type="text"
+        value={cellName()}
+        onInput={(e) => setCellName(e.currentTarget.value)}
+      />
+      {getRCell().value}
+      {/* {signal.value.value} */}
+      <br />
+      <input
+        type="range"
+        min={0}
+        max={20}
+        value={getRCell().value}
+        // value={signal.value.value}
+        onInput={(e) => {
+          const value = +e.currentTarget.value;
+          setRCell((cellSignal: any) => ({
+            code: cellSignal.code,
+            value,
+          }));
+        }}
+        // onInput={(e) =>
+        //   (signal.value = {
+        //     code: signal.value.code,
+        //     value: +e.currentTarget.value,
+        //   })
+        // }
+      />
     </div>
   );
 };

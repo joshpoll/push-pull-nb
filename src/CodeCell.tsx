@@ -37,6 +37,7 @@ import {
 import { lintKeymap } from "@codemirror/lint";
 import { javascript } from "@codemirror/lang-javascript";
 import { reactive, createSignal as createSignalR } from "./reactively";
+import { SetStoreFunction } from "solid-js/store";
 
 export type Kind = "signal" | "computation" | "effect" | "dead";
 
@@ -44,6 +45,8 @@ export type CodeCellProps = {
   kind?: Kind;
   initialCode?: string;
   cellName: string;
+  cells: { [key: string]: any };
+  setCells: SetStoreFunction<{ [key: string]: any }>;
 };
 
 export type CellSignal = {
@@ -129,21 +132,67 @@ export const CodeCell = (props: CodeCellProps) => {
       {
         key: "Shift-Enter",
         run: (e) => {
-          try {
-            console.log(
-              "run code",
-              e.state.doc.toString(),
-              eval(e.state.doc.toString())
-            );
-            setRCell({
-              code: e.state.doc.toString(),
-              value: eval(e.state.doc.toString()),
-            });
-            // signal.value = {
-            //   code: e.state.doc.toString(),
-            //   value: eval(e.state.doc.toString()),
-            // };
-          } catch (e) {}
+          if (kind() === "signal") {
+            try {
+              console.log(
+                "run code",
+                e.state.doc.toString(),
+                eval(e.state.doc.toString())
+              );
+              setRCell({
+                code: e.state.doc.toString(),
+                value: eval(e.state.doc.toString()),
+              });
+              const wrappedCell = reactive(
+                // Function("cells", e.state.doc.toString())(props.cells)
+                eval(e.state.doc.toString())
+              );
+              // console.log("wrappedCell", wrappedCell, wrappedCell.get());
+              // Object.defineProperty(props.cells, cellName(), {
+              //   get: wrappedCell.get,
+              //   set: wrappedCell.setSignal,
+              // });
+              props.setCells(cellName(), {
+                get: () => wrappedCell.get(),
+                set: (value: any) => wrappedCell.setSignal(value),
+              });
+              // console.log("cell value", props.cells[cellName()].get());
+              // signal.value = {
+              //   code: e.state.doc.toString(),
+              //   value: eval(e.state.doc.toString()),
+              // };
+            } catch (e) {}
+          } else if (kind() === "computation") {
+            try {
+              const reifiedCells = Object.keys(props.cells).reduce(
+                (acc, key) => {
+                  return {
+                    ...acc,
+                    get [key]() {
+                      return props.cells[key].get();
+                    },
+                  };
+                },
+                {} as { [key: string]: any }
+              );
+              const wrappedCell = reactive(() =>
+                Function("cells", e.state.doc.toString())(reifiedCells)
+              );
+              props.setCells(cellName(), {
+                get: () => wrappedCell.get(),
+                set: (value: any) => wrappedCell.set(value),
+              });
+              console.log(
+                "computation",
+                reifiedCells.x,
+                reifiedCells.y,
+                props.cells.z.get(),
+                e.state.doc.toString(),
+                Function("cells", e.state.doc.toString())(reifiedCells),
+                wrappedCell.get()
+              );
+            } catch (e) {}
+          }
           return true;
         },
       },

@@ -39,6 +39,8 @@ let CurrentGetsIndex = 0;
 /** A list of non-clean 'effect' nodes that will be updated when stabilize() is called */
 let EffectQueue: Reactive<any>[] = [];
 
+let StabilizeQueued = false;
+
 /** reactive nodes are marked dirty when their source values change TBD*/
 export const CacheClean = 0; // reactive value is valid, no need to recompute
 export const CacheCheck = 1; // reactive value might be stale, check parent nodes to decide whether to recompute
@@ -61,8 +63,11 @@ type CacheNonClean = typeof CacheCheck | typeof CacheDirty;
  * The reactive function is re-evaluated when any of its dependencies change, and the result is
  * cached.
  */
-export function reactive<T>(fnOrValue: T | (() => T)): Reactive<T> {
-  return new Reactive(fnOrValue);
+export function reactive<T>(
+  fnOrValue: T | (() => T),
+  effect?: boolean
+): Reactive<T> {
+  return new Reactive(fnOrValue, effect);
 }
 
 function defaultEquality(a: any, b: any) {
@@ -176,7 +181,13 @@ export class Reactive<T> {
   private stale(state: CacheNonClean): void {
     if (this.state < state) {
       // If we were previously clean, then we know that we may need to update to get the new value
-      if (this.state === CacheClean && this.effect) EffectQueue.push(this);
+      if (this.state === CacheClean && this.effect) {
+        EffectQueue.push(this);
+        if (!StabilizeQueued) {
+          StabilizeQueued = true;
+          requestAnimationFrame(stabilize);
+        }
+      }
 
       this.state = state;
       if (this.observers) {
@@ -303,6 +314,7 @@ export function stabilize() {
     EffectQueue[i].get();
   }
   EffectQueue.length = 0;
+  StabilizeQueued = false;
 }
 
 type Setter<T> = (<U extends T>(value: (prev: T) => U) => void) &

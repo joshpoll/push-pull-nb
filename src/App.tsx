@@ -37,25 +37,58 @@ import {
 import { lintKeymap } from "@codemirror/lint";
 import { javascript } from "@codemirror/lang-javascript";
 import { CodeCell } from "./CodeCell";
+import { TestReactively } from "./Test";
+import { createStore } from "solid-js/store";
 
 const App: Component = () => {
+  // const cells = {};
+  const [cells, setCells] = createStore({});
+
   return (
     <>
-      <CodeCell cellName={"x"} initialCode={"10"} />
-      <br />
-      <CodeCell cellName={"y"} initialCode={"5"} />
+      <TestReactively />
+      <CodeCell
+        cells={cells}
+        setCells={setCells}
+        cellName={"x"}
+        initialCode={"10"}
+      />
       <br />
       <CodeCell
+        cells={cells}
+        setCells={setCells}
+        cellName={"y"}
+        initialCode={"5"}
+      />
+      <br />
+      <CodeCell
+        cells={cells}
+        setCells={setCells}
         cellName={"z"}
-        initialCode={"cells.x + cells.y"}
+        initialCode={"return cells.x + cells.y"}
         kind="computation"
       />
       <br />
-      <CodeCell cellName={"x"} kind="computation" />
+      <CodeCell
+        cells={cells}
+        setCells={setCells}
+        cellName={"x"}
+        kind="computation"
+      />
       <br />
-      <CodeCell cellName={"x"} kind="computation" />
+      <CodeCell
+        cells={cells}
+        setCells={setCells}
+        cellName={"x"}
+        kind="computation"
+      />
       <br />
-      <CodeCell cellName={"x"} kind="computation" />
+      <CodeCell
+        cells={cells}
+        setCells={setCells}
+        cellName={"x"}
+        kind="computation"
+      />
     </>
   );
 };

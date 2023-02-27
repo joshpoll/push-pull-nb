@@ -1,4 +1,4 @@
-import type { Component } from "solid-js";
+import { Component, createEffect } from "solid-js";
 
 import logo from "./logo.svg";
 import styles from "./App.module.css";
@@ -36,8 +36,13 @@ import {
 } from "@codemirror/autocomplete";
 import { lintKeymap } from "@codemirror/lint";
 import { javascript } from "@codemirror/lang-javascript";
-import { reactive, createSignal as createSignalR } from "./reactively";
+import {
+  reactive,
+  createSignal as createSignalR,
+  stabilize,
+} from "./reactively";
 import { SetStoreFunction } from "solid-js/store";
+import { fromReactively } from "./util";
 
 export type Kind = "signal" | "computation" | "effect" | "dead";
 
@@ -59,34 +64,65 @@ export const CodeCell = (props: CodeCellProps) => {
 
   const [kind, setKind] = createSignal<Kind>(props.kind ?? "signal");
 
-  // const [cellSignal, setCellSignal] = createSignal<any>({
-  //   value: undefined,
-  //   code: "",
-  // });
+  const cell = {
+    code: reactive<string>(""),
+    value: reactive<any>(undefined),
+  };
 
-  // const signal = reactive<{ value: any; code: string }>({
-  //   value: undefined,
-  //   code: "",
-  // });
-
-  const [rCellSignal, setRCellSignal] = createSignalR<CellSignal>({
-    value: undefined,
-    code: "",
+  createEffect(() => {
+    props.setCells(cellName(), {
+      get: () => cell.value.get(),
+      set: (value: any) => cell.value.set(value),
+    });
   });
 
-  const [updateSignal, setUpdateSignal] = createSignal(0);
+  const cellCode = fromReactively<string>(cell.code);
+  const cellValue = fromReactively<any>(cell.value);
 
-  const getRCell = () => {
-    // console.log("getRCellSignal", rCellSignal());
-    updateSignal();
-    return rCellSignal();
-  };
+  // createEffect(() => {
+  //   console.log("cell", cellName(), cellValue());
+  //   console.log("dependencies", cell.value.dependencies());
+  // });
 
-  const setRCell = (cellSignal: any) => {
-    // console.log("setRCellSignal", cellSignal({}));
-    setUpdateSignal((x) => x + 1);
-    setRCellSignal(cellSignal);
-  };
+  const otherCells = () =>
+    Object.keys(props.cells).filter((key) => key !== cellName());
+
+  createEffect(() => {
+    console.log("otherCells", cellName(), otherCells());
+  });
+
+  const reifiedCells = () =>
+    new Proxy(props.cells, {
+      get(target, name, receiver) {
+        if (name === cellName()) {
+          // TODO: This is a hack to prevent infinite recursion, but can we loosen this restriction?
+          throw new Error("Cannot reference self in a computation.");
+        }
+        return Reflect.get(target, name, receiver).get();
+      },
+      set() {
+        throw new Error("Cannot mutate cells in a computation.");
+      },
+    });
+
+  const mutableReifiedCells = () =>
+    new Proxy(props.cells, {
+      get(target, name, receiver) {
+        if (name === cellName()) {
+          // TODO: This is a hack to prevent infinite recursion, but can we loosen this restriction?
+          throw new Error("Cannot reference self in a dead cell.");
+        }
+        return Reflect.get(target, name, receiver).get();
+      },
+      set(target, name, value, receiver) {
+        if (name === cellName()) {
+          // TODO: This is a hack to prevent infinite recursion, but can we loosen this restriction?
+          throw new Error("Cannot reference self in a dead cell.");
+        }
+        console.log("setting");
+        return Reflect.get(target, name, receiver).set(value);
+      },
+    });
 
   const {
     editorView,
@@ -134,64 +170,28 @@ export const CodeCell = (props: CodeCellProps) => {
         run: (e) => {
           if (kind() === "signal") {
             try {
-              console.log(
-                "run code",
-                e.state.doc.toString(),
-                eval(e.state.doc.toString())
-              );
-              setRCell({
-                code: e.state.doc.toString(),
-                value: eval(e.state.doc.toString()),
-              });
-              const wrappedCell = reactive(
-                // Function("cells", e.state.doc.toString())(props.cells)
-                eval(e.state.doc.toString())
-              );
-              // console.log("wrappedCell", wrappedCell, wrappedCell.get());
-              // Object.defineProperty(props.cells, cellName(), {
-              //   get: wrappedCell.get,
-              //   set: wrappedCell.setSignal,
-              // });
-              props.setCells(cellName(), {
-                get: () => wrappedCell.get(),
-                set: (value: any) => wrappedCell.setSignal(value),
-              });
-              // console.log("cell value", props.cells[cellName()].get());
-              // signal.value = {
-              //   code: e.state.doc.toString(),
-              //   value: eval(e.state.doc.toString()),
-              // };
+              cell.value.setSignal(eval(e.state.doc.toString()));
             } catch (e) {}
           } else if (kind() === "computation") {
             try {
-              const reifiedCells = Object.keys(props.cells).reduce(
-                (acc, key) => {
-                  return {
-                    ...acc,
-                    get [key]() {
-                      return props.cells[key].get();
-                    },
-                  };
-                },
-                {} as { [key: string]: any }
-              );
-              const wrappedCell = reactive(() =>
-                Function("cells", e.state.doc.toString())(reifiedCells)
-              );
-              props.setCells(cellName(), {
-                get: () => wrappedCell.get(),
-                set: (value: any) => wrappedCell.set(value),
-              });
-              console.log(
-                "computation",
-                reifiedCells.x,
-                reifiedCells.y,
-                props.cells.z.get(),
-                e.state.doc.toString(),
-                Function("cells", e.state.doc.toString())(reifiedCells),
-                wrappedCell.get()
+              cell.value.set(() =>
+                Function("cells", e.state.doc.toString())(reifiedCells())
               );
             } catch (e) {}
+          } else if (kind() === "effect") {
+            // TODO
+          } else if (kind() === "dead") {
+            try {
+              // notice we left out () => here and we're also using mutableReifiedCells
+              // the first ensures that we don't auto-update (it acts like a signal, not a
+              // computation)
+              // the second ensures we can mutate values inside it
+              cell.value.set(
+                Function("cells", e.state.doc.toString())(mutableReifiedCells())
+              );
+            } catch (e) {}
+          } else {
+            throw new Error(`unknown kind of cell ${kind()}`);
           }
           return true;
         },
@@ -214,35 +214,37 @@ export const CodeCell = (props: CodeCellProps) => {
         <option value="dead">dead</option>
       </select>
       <br />
-      {cellName()} = <div ref={editorRef} />
+      <table>
+        <tbody>
+          <tr>
+            <td>{cellName()} =</td>
+            <td>
+              <div ref={editorRef} />
+            </td>
+          </tr>
+        </tbody>
+      </table>
       <input
         type="text"
         value={cellName()}
         onInput={(e) => setCellName(e.currentTarget.value)}
       />
-      {getRCell().value}
-      {/* {signal.value.value} */}
-      <br />
-      <input
-        type="range"
-        min={0}
-        max={20}
-        value={getRCell().value}
-        // value={signal.value.value}
-        onInput={(e) => {
-          const value = +e.currentTarget.value;
-          setRCell((cellSignal: any) => ({
-            code: cellSignal.code,
-            value,
-          }));
-        }}
-        // onInput={(e) =>
-        //   (signal.value = {
-        //     code: signal.value.code,
-        //     value: +e.currentTarget.value,
-        //   })
-        // }
-      />
+      {cellValue()}
+      {kind() === "signal" && (
+        <>
+          <br />
+          <input
+            type="range"
+            min={0}
+            max={20}
+            value={cellValue()}
+            onInput={(e) => {
+              const value = +e.currentTarget.value;
+              cell.value.setSignal(value);
+            }}
+          />
+        </>
+      )}
     </div>
   );
 };

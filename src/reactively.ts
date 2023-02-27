@@ -112,6 +112,10 @@ export class Reactive<T> {
     }
   }
 
+  dependencies(): Reactive<any>[] {
+    return this.sources || [];
+  }
+
   peek(): T {
     return this._value;
   }
